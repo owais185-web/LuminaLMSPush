@@ -14,10 +14,26 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID || "1:123456789:web:abc123def456"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Check if config is valid (not default placeholders)
+const isConfigValid = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("YOUR_API_KEY");
 
-// Initialize Services
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-export const db_firestore = getFirestore(app);
+let app;
+let auth = null;
+let googleProvider = null;
+let db_firestore = null;
+
+if (isConfigValid) {
+    try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        googleProvider = new GoogleAuthProvider();
+        db_firestore = getFirestore(app);
+        console.log("Firebase initialized successfully");
+    } catch (e) {
+        console.error("Firebase Initialization Failed:", e);
+    }
+} else {
+    console.warn("Lumina LMS: Firebase keys are missing or invalid. Google SSO and Cloud Storage will be disabled. Please update firebaseConfig.ts.");
+}
+
+export { auth, googleProvider, db_firestore };

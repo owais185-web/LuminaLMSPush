@@ -4,10 +4,9 @@ import { UserRole, User } from '../types';
 import { db } from '../services/db';
 import { ArrowRight, Shield, GraduationCap, AlertCircle, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { Button, InputField } from '../components/Common';
-import { auth, googleProvider } from '../firebaseConfig';
-import { signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { db_firestore } from '../firebaseConfig';
+import { auth, googleProvider, db_firestore } from '../firebaseConfig';
+import { signInWithPopup } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -34,19 +33,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   const handleGoogleLogin = async () => {
       setError('');
+      
+      if (!auth || !googleProvider) {
+          setError("Google Sign In is disabled. Please add valid keys to firebaseConfig.ts");
+          return;
+      }
+
       setIsLoading(true);
       try {
           const result = await signInWithPopup(auth, googleProvider);
           const firebaseUser = result.user;
 
-          // 1. Save/Update user in Firestore (Real DB)
-          const userRef = doc(db_firestore, "users", firebaseUser.uid);
-          await setDoc(userRef, {
-              email: firebaseUser.email,
-              displayName: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              lastLogin: new Date()
-          }, { merge: true });
+          // 1. Save/Update user in Firestore (Real DB) if available
+          if (db_firestore) {
+              const userRef = doc(db_firestore, "users", firebaseUser.uid);
+              await setDoc(userRef, {
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName,
+                  photoURL: firebaseUser.photoURL,
+                  lastLogin: new Date().toISOString()
+              }, { merge: true });
+          }
 
           // 2. Sync with local Mock DB (for existing app architecture compatibility)
           const appUser = db.users.syncGoogleUser(firebaseUser);

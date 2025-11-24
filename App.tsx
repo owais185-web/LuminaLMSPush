@@ -28,32 +28,44 @@ const App: React.FC = () => {
 
   // Initialize Session (Hybrid: Firebase + Local Mock)
   useEffect(() => {
-    // Firebase Auth Listener
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-         // User is signed in via Firebase
-         // Sync with local Mock DB for app compatibility
-         const appUser = db.users.syncGoogleUser(firebaseUser);
-         handleLogin(appUser);
-         setIsSessionLoading(false);
-      } else {
-         // Check for legacy mock session (if not using Firebase)
-         const storedUserId = localStorage.getItem('lumina_session_user');
-         if (storedUserId) {
-             const user = db.users.findById(storedUserId);
-             if (user) {
-                 setCurrentUser(user);
-                 setIsAuthenticated(true);
-                 const lastView = localStorage.getItem('lumina_last_view');
-                 setCurrentView(lastView || defaultViews[user.role]);
-             }
-         }
-         setIsSessionLoading(false);
-      }
-    });
+    let unsubscribe = () => {};
+
+    if (auth) {
+        // Firebase Auth Listener
+        unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) {
+             // User is signed in via Firebase
+             // Sync with local Mock DB for app compatibility
+             const appUser = db.users.syncGoogleUser(firebaseUser);
+             handleLogin(appUser);
+             setIsSessionLoading(false);
+          } else {
+             checkLocalSession();
+             setIsSessionLoading(false);
+          }
+        });
+    } else {
+        // Fallback if Firebase is not configured
+        checkLocalSession();
+        setIsSessionLoading(false);
+    }
 
     return () => unsubscribe();
   }, []);
+
+  const checkLocalSession = () => {
+     // Check for legacy mock session (if not using Firebase)
+     const storedUserId = localStorage.getItem('lumina_session_user');
+     if (storedUserId) {
+         const user = db.users.findById(storedUserId);
+         if (user) {
+             setCurrentUser(user);
+             setIsAuthenticated(true);
+             const lastView = localStorage.getItem('lumina_last_view');
+             setCurrentView(lastView || defaultViews[user.role]);
+         }
+     }
+  };
 
   const handleLogin = (user: User) => {
     // Save Session Locally (for legacy compatibility)
@@ -69,7 +81,9 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      if (auth) {
+        await signOut(auth);
+      }
     } catch (e) {
       console.error("Firebase SignOut Error", e);
     }
