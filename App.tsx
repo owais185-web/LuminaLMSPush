@@ -9,6 +9,8 @@ import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { db } from './services/db';
 import { UserRole, User } from './types';
+import { auth } from './firebaseConfig';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const App: React.FC = () => {
   // State
@@ -24,45 +26,55 @@ const App: React.FC = () => {
     student: 'learning'
   };
 
-  // Initialize Session
+  // Initialize Session (Hybrid: Firebase + Local Mock)
   useEffect(() => {
-    const restoreSession = () => {
-        try {
-            const storedUserId = localStorage.getItem('lumina_session_user');
-            if (storedUserId) {
-                const user = db.users.findById(storedUserId);
-                if (user) {
-                    setCurrentUser(user);
-                    setIsAuthenticated(true);
-                    // Restore last view or default to role home
-                    const lastView = localStorage.getItem('lumina_last_view');
-                    setCurrentView(lastView || defaultViews[user.role]);
-                }
-            }
-        } catch (e) {
-            console.error("Session restore failed", e);
-        } finally {
-            // Small artificial delay to prevent flash if checking is instant, 
-            // and gives a sense of "App Loading"
-            setTimeout(() => setIsSessionLoading(false), 500);
-        }
-    };
-    restoreSession();
+    // Firebase Auth Listener
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+         // User is signed in via Firebase
+         // Sync with local Mock DB for app compatibility
+         const appUser = db.users.syncGoogleUser(firebaseUser);
+         handleLogin(appUser);
+         setIsSessionLoading(false);
+      } else {
+         // Check for legacy mock session (if not using Firebase)
+         const storedUserId = localStorage.getItem('lumina_session_user');
+         if (storedUserId) {
+             const user = db.users.findById(storedUserId);
+             if (user) {
+                 setCurrentUser(user);
+                 setIsAuthenticated(true);
+                 const lastView = localStorage.getItem('lumina_last_view');
+                 setCurrentView(lastView || defaultViews[user.role]);
+             }
+         }
+         setIsSessionLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = (user: User) => {
-    // Save Session
+    // Save Session Locally (for legacy compatibility)
     localStorage.setItem('lumina_session_user', user.id);
     const view = defaultViews[user.role];
-    localStorage.setItem('lumina_last_view', view);
-
+    // Only reset view if not already set (preserve view on refresh if possible)
+    const savedView = localStorage.getItem('lumina_last_view');
+    
     setCurrentUser(user);
-    setCurrentView(view);
+    setCurrentView(savedView || view);
     setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
-    // Clear Session
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error("Firebase SignOut Error", e);
+    }
+    
+    // Clear Local Session
     localStorage.removeItem('lumina_session_user');
     localStorage.removeItem('lumina_last_view');
 

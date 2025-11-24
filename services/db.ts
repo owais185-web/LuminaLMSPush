@@ -79,7 +79,41 @@ export const db = {
         return updatedUsers.find(u => u.id === userId);
     },
     find: (email: string) => db.users.getAll().find(u => u.email.toLowerCase() === email.toLowerCase()),
-    findById: (id: string) => db.users.getAll().find(u => u.id === id)
+    findById: (id: string) => db.users.getAll().find(u => u.id === id),
+    
+    // SPRINT 9: Sync Firebase User to Local DB
+    // This bridges the gap between Firebase Auth and the app's mock data structure
+    syncGoogleUser: (firebaseUser: any): User => {
+        const users = db.users.getAll();
+        const existing = users.find(u => u.email === firebaseUser.email);
+        
+        if (existing) {
+            // Update avatar if changed on Google
+            if (firebaseUser.photoURL && existing.avatar !== firebaseUser.photoURL) {
+                const updated = { ...existing, avatar: firebaseUser.photoURL };
+                db.users.update(updated);
+                return updated;
+            }
+            return existing;
+        }
+
+        // Create new student user from Google Data
+        const newUser: User = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Lumina Student',
+            email: firebaseUser.email,
+            role: 'student', // Default role for new signups
+            avatar: firebaseUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(firebaseUser.displayName)}`,
+            billing: {
+                autoPaymentEnabled: false,
+                status: 'active'
+            },
+            enrolledCourses: []
+        };
+        
+        db.users.add(newUser);
+        return newUser;
+    }
   },
   courses: {
     getAll: () => load<Course>(KEYS.COURSES, MOCK_COURSES),
