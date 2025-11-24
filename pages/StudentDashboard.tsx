@@ -53,6 +53,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ view, curren
 
   const teacherAvatar = "https://picsum.photos/seed/teacher/200";
 
+ // Effect 1: Initialize Data (Fetch from DB on mount)
   useEffect(() => {
     const init = async () => {
        setLoading(true);
@@ -74,6 +75,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ view, curren
        setDailyWisdom(quote);
        setLoading(false);
     };
+    
+    init();
+  }, [currentUser.id]); // REMOVED nextClass from here to stop the loop
+
+  // Effect 2: Handle Countdown Timer (Runs only when nextClass updates)
+  useEffect(() => {
+    const timer = setInterval(() => {
+        if (!nextClass) return;
+        const now = new Date();
+        const diff = new Date(nextClass.startTime).getTime() - now.getTime();
+        
+        if (diff <= 0) {
+            setTimeLeft("Live Now");
+        } else {
+            const minutes = Math.floor((diff / 1000 / 60) % 60);
+            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            setTimeLeft(`${hours}h ${minutes}m`);
+        }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [nextClass]); // This is safe to depend on nextClass
     
     init();
 
