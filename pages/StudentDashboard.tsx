@@ -51,6 +51,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ view, curren
   const [actionMessage, setActionMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
 
   const teacherAvatar = "https://picsum.photos/seed/teacher/200";
+  const userId = currentUser.id;
 
   // Data Fetching Effect
   useEffect(() => {
@@ -66,8 +67,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ view, curren
        setNextClass(upcoming || null);
        
        setAllCourses(dbCourses);
-       setTransactions(db.transactions.getByUser(currentUser.id));
-       setMyTickets(db.tickets.getAll().filter(t => t.userId === currentUser.id));
+       setTransactions(db.transactions.getByUser(userId));
+       setMyTickets(db.tickets.getAll().filter(t => t.userId === userId));
        setResources(db.resources.getAll());
 
        const quote = await generateDailyQuote();
@@ -76,12 +77,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ view, curren
     };
     
     init();
-  }, [currentUser.id]); // Removed nextClass dependency to prevent infinite loop
+  }, [userId]);
 
   // Countdown Timer Effect
   useEffect(() => {
+    if (!nextClass) return;
+
     const timer = setInterval(() => {
-        if (!nextClass) return;
         const now = new Date();
         const diff = new Date(nextClass.startTime).getTime() - now.getTime();
         
